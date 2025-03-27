@@ -22,10 +22,14 @@ from local_operator.server.routes import (
     chat,
     config,
     credentials,
+    execution,
+    files,
     health,
     jobs,
     models,
     static,
+    system,
+    websocket,
 )
 
 logger = logging.getLogger("local_operator.server")
@@ -81,6 +85,10 @@ app = FastAPI(
         {"name": "Credentials", "description": "Credential management endpoints"},
         {"name": "Models", "description": "Model management endpoints"},
         {"name": "Static", "description": "Static file hosting endpoints"},
+        {"name": "System", "description": "System management endpoints"},
+        {"name": "WebSocket", "description": "WebSocket endpoints for real-time communication"},
+        {"name": "Execution", "description": "Code execution monitoring endpoints"},
+        {"name": "Files", "description": "File upload/download endpoints"},
     ],
 )
 
@@ -131,4 +139,24 @@ app.include_router(
 # /v1/static
 app.include_router(
     static.router,
+)
+
+# System endpoints
+app.include_router(
+    system.router,
+)
+
+# WebSocket endpoints
+app.include_router(
+    websocket.router,
+)
+
+# Execution endpoints
+app.include_router(
+    execution.router,
+)
+
+# /v1/files
+app.include_router(
+    files.router,
 )
