@@ -29,6 +29,7 @@ from local_operator.server.routes import (
     models,
     static,
     system,
+    ui,
     websocket,
 )
 
@@ -86,6 +87,7 @@ app = FastAPI(
         {"name": "Models", "description": "Model management endpoints"},
         {"name": "Static", "description": "Static file hosting endpoints"},
         {"name": "System", "description": "System management endpoints"},
+        {"name": "UI", "description": "User interface endpoints"},
         {"name": "WebSocket", "description": "WebSocket endpoints for real-time communication"},
         {"name": "Execution", "description": "Code execution monitoring endpoints"},
         {"name": "Files", "description": "File upload/download endpoints"},
@@ -144,6 +146,11 @@ app.include_router(
 # System endpoints
 app.include_router(
     system.router,
+)
+
+# UI endpoints
+app.include_router(
+    ui.router,
 )
 
 # WebSocket endpoints
