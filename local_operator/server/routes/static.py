@@ -27,55 +27,12 @@ async def get_index():
         HTMLResponse: The index page HTML
     """
     try:
-        with open(HTML_DIR / "index.html", "r") as f:
+        # Try to load the index.html file, or fall back to default_index.html
+        template_path = HTML_DIR / 'index.html' if (HTML_DIR / 'index.html').exists() else HTML_DIR / 'default_index.html'
+        with open(template_path, 'r') as f:
             return f.read()
     except FileNotFoundError:
-        # If index.html doesn't exist, return a simple HTML page
-        return """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Local Operator</title>
-            <style>
-                body {
-                    font-family: Arial, sans-serif;
-                    line-height: 1.6;
-                    margin: 0;
-                    padding: 20px;
-                    max-width: 800px;
-                    margin: 0 auto;
-                }
-                h1 {
-                    color: #2c3e50;
-                }
-                ul {
-                    list-style-type: none;
-                    padding: 0;
-                }
-                li {
-                    margin-bottom: 10px;
-                }
-                a {
-                    color: #3498db;
-                    text-decoration: none;
-                }
-                a:hover {
-                    text-decoration: underline;
-                }
-            </style>
-        </head>
-        <body>
-            <h1>Local Operator</h1>
-            <p>Welcome to the Local Operator API server.</p>
-            <h2>Available Pages:</h2>
-            <ul>
-                <li><a href="/docs">API Documentation</a></li>
-                <li><a href="/redoc">ReDoc API Documentation</a></li>
-                <li><a href="/documents">Document Upload Interface</a></li>
-            </ul>
-        </body>
-        </html>
-        """
+        raise HTTPException(status_code=404, detail='Index template not found')
 
 
 @router.get("/documents", response_class=HTMLResponse)
