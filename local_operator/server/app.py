@@ -30,6 +30,7 @@ from local_operator.server.routes import (
     static,
     websockets,
 )
+from local_operator.server.routes.slack import validate_slack_credentials
 from local_operator.server.utils.websocket_manager import WebSocketManager
 
 ENV_LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
@@ -75,6 +76,26 @@ async def lifespan(app: FastAPI):
     app.state.agent_registry = AgentRegistry(config_dir=config_dir, refresh_interval=3.0)
     app.state.job_manager = JobManager()
     app.state.websocket_manager = WebSocketManager()
+    
+    # Validate Slack credentials and send a test message
+    logger.info("Validating Slack credentials...")
+    validation_results = validate_slack_credentials(app.state.credential_manager)
+    
+    if validation_results["slack_bot_token_valid"]:
+        logger.info("✅ Slack bot token is valid")
+    else:
+        logger.warning("❌ Slack bot token is invalid or not configured")
+        
+    if validation_results["slack_app_token_valid"]:
+        logger.info("✅ Slack app token is valid")
+    else:
+        logger.warning("❌ Slack app token is invalid or not configured")
+        
+    if validation_results["test_message_sent"]:
+        logger.info("✅ Test message sent to Slack")
+    else:
+        logger.warning("❌ Failed to send test message to Slack")
+    
     yield
     # Clean up on shutdown
     app.state.credential_manager = None

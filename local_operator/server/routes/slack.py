@@ -7,6 +7,7 @@ This module contains the FastAPI route handlers for Slack-related endpoints.
 import logging
 import json
 import re
+import requests
 from typing import Any, Dict, List, Union
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -41,6 +42,80 @@ from local_operator.tools import execute_wsl_command
 
 router = APIRouter(tags=["Slack"])
 logger = logging.getLogger("local_operator.server.routes.slack")
+
+
+def validate_slack_credentials(credential_manager: CredentialManager) -> Dict[str, bool]:
+    """
+    Validate Slack credentials and send a test message.
+    
+    Args:
+        credential_manager: The credential manager instance
+        
+    Returns:
+        Dict[str, bool]: A dictionary with validation results
+    """
+    validation_results = {
+        "slack_bot_token_valid": False,
+        "slack_app_token_valid": False,
+        "test_message_sent": False
+    }
+    
+    # Check if Slack credentials are configured
+    slack_bot_token = credential_manager.get_credential("SLACK_BOT_TOKEN")
+    slack_app_token = credential_manager.get_credential("SLACK_APP_TOKEN")
+    
+    if not slack_bot_token:
+        logger.warning("SLACK_BOT_TOKEN not configured. Slack integration will not work properly.")
+        return validation_results
+    
+    if not slack_app_token:
+        logger.warning("SLACK_APP_TOKEN not configured. Slack integration will not work properly.")
+    else:
+        validation_results["slack_app_token_valid"] = True
+    
+    # Validate Slack Bot Token by calling the auth.test API
+    try:
+        response = requests.post(
+            "https://slack.com/api/auth.test",
+            headers={"Authorization": f"Bearer {slack_bot_token}"}
+        )
+        data = response.json()
+        
+        if data.get("ok"):
+            validation_results["slack_bot_token_valid"] = True
+            logger.info(f"Slack bot token validated. Connected as: {data.get('user')} to workspace: {data.get('team')}")
+            
+            # Send a test message to the default channel
+            default_channel = credential_manager.get_credential("SLACK_DEFAULT_CHANNEL")
+            if default_channel:
+                try:
+                    message_response = requests.post(
+                        "https://slack.com/api/chat.postMessage",
+                        headers={
+                            "Authorization": f"Bearer {slack_bot_token}",
+                            "Content-Type": "application/json"
+                        },
+                        json={
+                            "channel": default_channel,
+                            "text": "Local Operator is now running and connected to Slack! 🚀"
+                        }
+                    )
+                    
+                    if message_response.json().get("ok"):
+                        validation_results["test_message_sent"] = True
+                        logger.info(f"Test message sent to channel: {default_channel}")
+                    else:
+                        logger.warning(f"Failed to send test message: {message_response.json().get('error')}")
+                except Exception as e:
+                    logger.error(f"Error sending test message: {str(e)}")
+            else:
+                logger.warning("SLACK_DEFAULT_CHANNEL not configured. Cannot send test message.")
+        else:
+            logger.error(f"Invalid Slack bot token: {data.get('error')}")
+    except Exception as e:
+        logger.error(f"Error validating Slack credentials: {str(e)}")
+    
+    return validation_results
 
 
 @router.post(
@@ -120,7 +195,7 @@ def extract_git_commands(text: str) -> List[str]:
     git_commands = []
     
     # Find all code blocks with bash/shell commands
-    code_blocks = re.findall(r'```(?:bash|shell)?\s*(.*?)```', text, re.DOTALL)
+    code_blocks = re.findall(r'```(?:bash|shell)?\\s*(.*?)```', text, re.DOTALL)
     
     for block in code_blocks:
         # Extract git commands from the code block
@@ -150,19 +225,19 @@ def extract_wsl_config(text: str) -> Dict[str, str]:
     }
     
     # Look for WSL2 configuration in the text
-    distribution_match = re.search(r'use wsl2 instance named ["\']([^"\']+)["\']', text, re.IGNORECASE)
+    distribution_match = re.search(r'use wsl2 instance named [\"\']([\w-]+)[\"\']', text, re.IGNORECASE)
     if distribution_match:
         wsl_config["distribution"] = distribution_match.group(1)
     
     # Look for username
-    username_match = re.search(r'["\']username[^"\']*["\'] ["\']([^"\']+)["\']', text, re.IGNORECASE)
+    username_match = re.search(r'[\"\'](username[\w-]*)[\"\'] [\"\']([\w-]+)[\"\']', text, re.IGNORECASE)
     if username_match:
-        wsl_config["username"] = username_match.group(1)
+        wsl_config["username"] = username_match.group(2)
     
     # Look for password
-    password_match = re.search(r'["\']password[^"\']*["\'] ["\']([^"\']+)["\']', text, re.IGNORECASE)
+    password_match = re.search(r'[\"\'](password[\w-]*)[\"\'] [\"\']([\w-]+)[\"\']', text, re.IGNORECASE)
     if password_match:
-        wsl_config["password"] = password_match.group(1)
+        wsl_config["password"] = password_match.group(2)
     
     return wsl_config
 
