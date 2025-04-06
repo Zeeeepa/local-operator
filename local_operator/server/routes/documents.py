@@ -77,10 +77,12 @@ async def upload_document(
         file_path = UPLOAD_DIR / unique_filename
         
         # Save the uploaded file
+        chunk_size = 1024 * 1024  # 1MB chunks
+        file_size = 0
         with open(file_path, "wb") as f:
-            content = await file.read()
-            f.write(content)
-            file_size = len(content)
+            while chunk := await file.read(chunk_size):
+                file_size += len(chunk)
+                f.write(chunk)
         
         # Create a response
         response = DocumentUploadResponse(
